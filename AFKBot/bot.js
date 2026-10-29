@@ -3,23 +3,21 @@
 const mineflayer = require('mineflayer')
 const http = require('http')
 
-const HOST = process.env.MC_HOST || process.argv[2] || 'localhost'
+const HOST = process.env.MC_HOST || process.argv[2] || 'jamsmp.mcsh.gg'
 const PORT = parseInt(process.env.MC_PORT || process.argv[3] || '25565', 10)
-// Replace '1.20.4' below with your server's exact Minecraft version string
-const VERSION = process.env.MC_VERSION || process.argv[4] || '1.20.4' 
 const USERNAME = process.env.MC_USER || 'AFK'
 const PASSWORD = process.env.MC_PASSWORD || 'AfkBot-Pass-123'
-const PASSIVE = process.env.MC_PASSIVE === '1' // 1 = never send movement packets
+const PASSIVE = process.env.MC_PASSIVE === '1'
 const RECONNECT_MS = 10000
 
 function start() {
-  console.log(`[AFK] Connecting to ${HOST}:${PORT} as ${USERNAME} (version: ${VERSION})...`)
+  console.log(`[AFK] Connecting to ${HOST}:${PORT} as ${USERNAME} (auto-detecting protocol)...`)
   const bot = mineflayer.createBot({
     host: HOST,
     port: PORT,
     username: USERNAME,
     auth: 'offline',
-    version: VERSION, // Explicit version prevents packet offset mismatches
+    version: false, // Step 2: Auto-detects the exact Minecraft server version during handshake
     checkTimeoutInterval: 60000
   })
 
@@ -34,7 +32,7 @@ function start() {
     setTimeout(start, RECONNECT_MS)
   }
 
-  bot.once('login', () => console.log(`[AFK] Logged in. Protocol version used: ${bot.version}`))
+  bot.once('login', () => console.log(`[AFK] Logged in. Protocol version detected & used: ${bot.version}`))
 
   bot.once('spawn', () => {
     console.log('[AFK] Joined the server.')
@@ -43,6 +41,7 @@ function start() {
     let tick = 0
     timer = setInterval(() => {
       tick++
+      // Safely swing arm and look around without triggering position/movement kicks
       bot.look(bot.entity.yaw + (Math.random() - 0.5), 0, true)
       if (tick % 12 === 0) bot.swingArm('right')
     }, 15000)
@@ -71,7 +70,7 @@ function start() {
 
 start()
 
-// Render web services must listen on $PORT, otherwise the deploy fails.
+// Render web service health check listener
 if (process.env.PORT) {
   http.createServer((req, res) => { res.end('AFK bot running') }).listen(process.env.PORT, () => {
     console.log('[AFK] Health server on port ' + process.env.PORT)
