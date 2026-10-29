@@ -7,15 +7,6 @@ const http = require('http')
 
 const HOST = process.env.MC_HOST || process.argv[2] || 'jamsmp.mcsh.gg'
 const PORT = process.env.MC_PORT ? parseInt(process.env.MC_PORT, 10) : (process.argv[3] ? parseInt(process.argv[3], 10) : undefined)
-
-// Ignore invalid MC_VERSION environment variables (like '26.1') and force protocol auto-detection
-let envVersion = process.env.MC_VERSION
-if (envVersion && !envVersion.startsWith('1.')) {
-  console.log(`[AFK] Invalid MC_VERSION env var detected ("${envVersion}"). Discarding and using auto-detection.`)
-  envVersion = false
-}
-
-const VERSION = envVersion || false
 const USERNAME = process.env.MC_USER || 'AFK'
 const PASSWORD = process.env.MC_PASSWORD || 'AfkBot-Pass-123'
 const RECONNECT_MS = 10000
@@ -27,12 +18,16 @@ function start() {
     host: HOST,
     username: USERNAME,
     auth: 'offline',
-    version: VERSION, // Auto-detects real Minecraft version (e.g. 1.21)
+    version: false, // Auto-detect server protocol version
     checkTimeoutInterval: 60000
   }
   if (PORT) botOptions.port = PORT
 
   const bot = mineflayer.createBot(botOptions)
+
+  // Completely disable client-side physics & position packet generation.
+  // Stops Mineflayer from sending gravity/position updates that conflict with Paper/AuthMe.
+  bot.physicsEnabled = false
 
   let timer = null
   let ended = false
@@ -45,25 +40,19 @@ function start() {
     setTimeout(start, RECONNECT_MS)
   }
 
-  bot.once('login', () => console.log(`[AFK] Logged in. Protocol version detected & used: ${bot.version}`))
+  bot.once('login', () => console.log(`[AFK] Logged in successfully.`))
 
   bot.once('spawn', () => {
-    console.log('[AFK] Joined the server successfully.')
+    console.log('[AFK] Joined the server and spawned.')
     
-    let tick = 0
+    // Anti-AFK loop: swing arm only.
+    // Do NOT use bot.look() or movement controls when physics is disabled.
     timer = setInterval(() => {
-      tick++
-      // Subtle rotation and arm swing to prevent AFK kick without breaking position sync
-      if (bot.entity) {
-        bot.look(bot.entity.yaw + (Math.random() - 0.5), 0, false)
-      }
-      if (tick % 4 === 0) {
-        bot.swingArm('right')
-      }
+      bot.swingArm('right')
     }, 15000)
   })
 
-  // AuthMe support: Handles standard chat, action bars, and title prompts
+  // AuthMe support: handles chat, action bar, and title prompts
   let authSent = 0
   const handleAuthPrompt = (rawText) => {
     if (!rawText) return
