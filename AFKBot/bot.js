@@ -24,10 +24,6 @@ function start() {
     checkTimeoutInterval: 60000
   })
 
-  // Disable client-side physics calculation completely.
-  // Prevents Mineflayer from sending movement/flying packets during gamemode changes.
-  bot.physicsEnabled = false
-
   let timer = null
   let ended = false
 
@@ -41,6 +37,7 @@ function start() {
 
   bot.once('login', () => console.log(`[AFK] Logged in successfully.`))
 
+  // Auto-respawn when killed
   bot.on('death', () => {
     console.log('[AFK] Bot died! Respawning automatically...')
     setTimeout(() => {
@@ -52,10 +49,11 @@ function start() {
     console.log('[AFK] Joined the server and spawned.')
     if (timer) clearInterval(timer)
 
+    // Wait 3 seconds for initial spawn teleports and AuthMe prompts to clear
     setTimeout(() => {
       if (ended) return
       timer = setInterval(() => {
-        if (bot && bot.swingArm) {
+        if (bot && bot.isAlive && bot.swingArm) {
           bot.swingArm('right')
         }
       }, 15000)
@@ -85,7 +83,7 @@ function start() {
   bot.on('title', (text) => handleAuthPrompt(text))
 
   bot.on('kicked', (reason) => console.log('[AFK] Kicked:', typeof reason === 'string' ? reason : JSON.stringify(reason)))
-  bot.on('error', (err) => console.log('[AFK] Error:', err.message))
+  bot.on('error', (err) => console.log('[AFK] Network Error:', err.message))
   bot.on('end', (reason) => reconnect(reason))
 }
 
