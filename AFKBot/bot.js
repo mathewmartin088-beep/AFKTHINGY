@@ -20,7 +20,7 @@ function start() {
     auth: 'offline',
     version: VERSION,
     checkTimeoutInterval: 60000,
-    physicsEnabled: false // PHYSICS TURNED OFF HERE
+    physicsEnabled: false // Physics turned off
   })
 
   let timer = null
@@ -39,16 +39,11 @@ function start() {
   bot.once('spawn', () => {
     console.log('[AFK] Joined the server.')
     if (PASSIVE) { console.log('[AFK] Passive mode: not moving.'); return }
-    let tick = 0
+    
     timer = setInterval(() => {
-      tick++
-      // look around a bit and hop every so often so the session counts as active
+      // Swing arm and look around slightly to prevent AFK kicks without moving position
+      bot.swingArm('right')
       bot.look(bot.entity.yaw + (Math.random() - 0.5), 0, true)
-      if (tick % 4 === 0) {
-        bot.setControlState('jump', true)
-        setTimeout(() => bot.setControlState('jump', false), 250)
-      }
-      if (tick % 12 === 0) bot.swingArm('right')
     }, 15000)
   })
 
@@ -76,7 +71,6 @@ function start() {
 start()
 
 // Render web services must listen on $PORT, otherwise the deploy fails.
-// Ping this URL every ~5 minutes (e.g. UptimeRobot) to stop the free tier sleeping.
 if (process.env.PORT) {
   http.createServer((req, res) => { res.end('AFK bot running') }).listen(process.env.PORT, () => {
     console.log('[AFK] Health server on port ' + process.env.PORT)
