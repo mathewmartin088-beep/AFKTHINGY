@@ -5,20 +5,21 @@ const http = require('http')
 
 const HOST = process.env.MC_HOST || process.argv[2] || 'localhost'
 const PORT = parseInt(process.env.MC_PORT || process.argv[3] || '25565', 10)
-const VERSION = process.env.MC_VERSION || process.argv[4] || false // false = auto-detect
+// Replace '1.20.4' below with your server's exact Minecraft version string
+const VERSION = process.env.MC_VERSION || process.argv[4] || '1.20.4' 
 const USERNAME = process.env.MC_USER || 'AFK'
 const PASSWORD = process.env.MC_PASSWORD || 'AfkBot-Pass-123'
 const PASSIVE = process.env.MC_PASSIVE === '1' // 1 = never send movement packets
 const RECONNECT_MS = 10000
 
 function start() {
-  console.log(`[AFK] Connecting to ${HOST}:${PORT} as ${USERNAME} (version: ${VERSION || 'auto'})...`)
+  console.log(`[AFK] Connecting to ${HOST}:${PORT} as ${USERNAME} (version: ${VERSION})...`)
   const bot = mineflayer.createBot({
     host: HOST,
     port: PORT,
     username: USERNAME,
     auth: 'offline',
-    version: VERSION,
+    version: VERSION, // Explicit version prevents packet offset mismatches
     checkTimeoutInterval: 60000
   })
 
