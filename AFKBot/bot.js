@@ -7,19 +7,18 @@ const http = require('http')
 
 const HOST = process.env.MC_HOST || process.argv[2] || 'jamsmp.mcsh.gg'
 const PORT = process.env.MC_PORT ? parseInt(process.env.MC_PORT, 10) : (process.argv[3] ? parseInt(process.argv[3], 10) : undefined)
-const VERSION = process.env.MC_VERSION || '26.3'
 const USERNAME = process.env.MC_USER || 'AFK'
 const PASSWORD = process.env.MC_PASSWORD || 'AfkBot-Pass-123'
 const RECONNECT_MS = 10000
 
 function start() {
-  console.log(`[AFK] Connecting to ${HOST}${PORT ? ':' + PORT : ''} as ${USERNAME} (version: ${VERSION})...`)
+  console.log(`[AFK] Connecting to ${HOST}${PORT ? ':' + PORT : ''} as ${USERNAME}...`)
   
   const botOptions = {
     host: HOST,
     username: USERNAME,
     auth: 'offline',
-    version: VERSION,
+    version: false, // Auto-detect protocol version directly from server handshake
     checkTimeoutInterval: 60000
   }
   if (PORT) botOptions.port = PORT
@@ -37,16 +36,13 @@ function start() {
     setTimeout(start, RECONNECT_MS)
   }
 
-  bot.once('login', () => console.log(`[AFK] Logged in successfully.`))
+  bot.once('login', () => console.log(`[AFK] Logged in using protocol version: ${bot.version}`))
 
   bot.once('spawn', () => {
     console.log('[AFK] Joined the server and spawned.')
     
     if (timer) clearInterval(timer)
 
-    // Anti-AFK activity loop:
-    // Safely checks that yaw is a valid number before attempting to rotate,
-    // avoiding NaN values in sent network packets.
     timer = setInterval(() => {
       if (bot.entity && typeof bot.entity.yaw === 'number' && !isNaN(bot.entity.yaw)) {
         bot.look(bot.entity.yaw + (Math.random() - 0.5), 0, false)
@@ -55,7 +51,7 @@ function start() {
     }, 15000)
   })
 
-  // AuthMe support for login/registration prompts
+  // AuthMe automatic login handler
   let authSent = 0
   const handleAuthPrompt = (rawText) => {
     if (!rawText) return
@@ -84,7 +80,6 @@ function start() {
 
 start()
 
-// Render health server
 if (process.env.PORT) {
   http.createServer((req, res) => { res.end('AFK bot running') }).listen(process.env.PORT, () => {
     console.log('[AFK] Health server running on port ' + process.env.PORT)
