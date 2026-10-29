@@ -19,7 +19,8 @@ function start() {
     username: USERNAME,
     auth: 'offline',
     version: VERSION,
-    checkTimeoutInterval: 60000
+    checkTimeoutInterval: 60000,
+    physicsEnabled: false // PHYSICS TURNED OFF HERE
   })
 
   let timer = null
