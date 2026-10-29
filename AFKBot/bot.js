@@ -7,18 +7,19 @@ const http = require('http')
 
 const HOST = process.env.MC_HOST || process.argv[2] || 'jamsmp.mcsh.gg'
 const PORT = process.env.MC_PORT ? parseInt(process.env.MC_PORT, 10) : (process.argv[3] ? parseInt(process.argv[3], 10) : undefined)
+const VERSION = process.env.MC_VERSION || '26.3'
 const USERNAME = process.env.MC_USER || 'AFK'
 const PASSWORD = process.env.MC_PASSWORD || 'AfkBot-Pass-123'
 const RECONNECT_MS = 10000
 
 function start() {
-  console.log(`[AFK] Connecting to ${HOST}${PORT ? ':' + PORT : ''} as ${USERNAME}...`)
+  console.log(`[AFK] Connecting to ${HOST}${PORT ? ':' + PORT : ''} as ${USERNAME} (version: ${VERSION})...`)
   
   const botOptions = {
     host: HOST,
     username: USERNAME,
     auth: 'offline',
-    version: false, // Auto-detect server protocol version
+    version: VERSION,
     checkTimeoutInterval: 60000
   }
   if (PORT) botOptions.port = PORT
@@ -43,30 +44,32 @@ function start() {
     
     if (timer) clearInterval(timer)
 
-    // Wait 3 seconds after spawn before starting the anti-AFK loop to let AuthMe teleports settle
-    setTimeout(() => {
-      if (ended) return
-      timer = setInterval(() => {
-        bot.swingArm('right')
-      }, 15000)
-    }, 3000)
+    // Anti-AFK activity loop:
+    // Safely checks that yaw is a valid number before attempting to rotate,
+    // avoiding NaN values in sent network packets.
+    timer = setInterval(() => {
+      if (bot.entity && typeof bot.entity.yaw === 'number' && !isNaN(bot.entity.yaw)) {
+        bot.look(bot.entity.yaw + (Math.random() - 0.5), 0, false)
+      }
+      bot.swingArm('right')
+    }, 15000)
   })
 
-  // AuthMe support: handles chat, action bar, and title prompts
+  // AuthMe support for login/registration prompts
   let authSent = 0
   const handleAuthPrompt = (rawText) => {
     if (!rawText) return
     const m = rawText.toLowerCase()
-    if (Date.now() - authSent < 3000) return
+    if (Date.now() - authSent < 4000) return
 
     if (m.includes('/register')) {
       authSent = Date.now()
       console.log('[AFK] Registering...')
-      bot.chat(`/register ${PASSWORD} ${PASSWORD}`)
+      setTimeout(() => bot.chat(`/register ${PASSWORD} ${PASSWORD}`), 500)
     } else if (m.includes('/login')) {
       authSent = Date.now()
       console.log('[AFK] Logging in...')
-      bot.chat(`/login ${PASSWORD}`)
+      setTimeout(() => bot.chat(`/login ${PASSWORD}`), 500)
     }
   }
 
@@ -81,9 +84,9 @@ function start() {
 
 start()
 
-// Render health check listener
+// Render health server
 if (process.env.PORT) {
   http.createServer((req, res) => { res.end('AFK bot running') }).listen(process.env.PORT, () => {
-    console.log('[AFK] Health server on port ' + process.env.PORT)
+    console.log('[AFK] Health server running on port ' + process.env.PORT)
   })
 }
