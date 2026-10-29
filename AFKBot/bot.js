@@ -17,7 +17,7 @@ function start() {
     port: PORT,
     username: USERNAME,
     auth: 'offline',
-    version: false, // Step 2: Auto-detects the exact Minecraft server version during handshake
+    version: false, // Step 2: Auto-detects protocol version from server handshake
     checkTimeoutInterval: 60000
   })
 
@@ -41,7 +41,7 @@ function start() {
     let tick = 0
     timer = setInterval(() => {
       tick++
-      // Safely swing arm and look around without triggering position/movement kicks
+      // Look around and swing arm without invalid position packet generation
       bot.look(bot.entity.yaw + (Math.random() - 0.5), 0, true)
       if (tick % 12 === 0) bot.swingArm('right')
     }, 15000)
