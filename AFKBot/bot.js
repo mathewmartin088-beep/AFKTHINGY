@@ -8,6 +8,7 @@ const PORT = parseInt(process.env.MC_PORT || process.argv[3] || '25565', 10)
 const VERSION = process.env.MC_VERSION || process.argv[4] || false // false = auto-detect
 const USERNAME = process.env.MC_USER || 'AFK'
 const PASSWORD = process.env.MC_PASSWORD || 'AfkBot-Pass-123'
+const PASSIVE = process.env.MC_PASSIVE === '1' // 1 = never send movement packets
 const RECONNECT_MS = 10000
 
 function start() {
@@ -32,8 +33,11 @@ function start() {
     setTimeout(start, RECONNECT_MS)
   }
 
+  bot.once('login', () => console.log(`[AFK] Logged in. Protocol version used: ${bot.version}`))
+
   bot.once('spawn', () => {
     console.log('[AFK] Joined the server.')
+    if (PASSIVE) { console.log('[AFK] Passive mode: not moving.'); return }
     let tick = 0
     timer = setInterval(() => {
       tick++
