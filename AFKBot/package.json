@@ -1,8 +1,6 @@
 {
-  "name": "afkbot",
-  "version": "1.0.0",
-  "private": true,
-  "main": "bot.js",
-  "scripts": { "start": "node bot.js" },
-  "dependencies": { "mineflayer": "latest" }
+  "dependencies": {
+    "mineflayer": "^4.20.0",
+    "minecraft-data": "latest"
+  }
 }
