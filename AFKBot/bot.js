@@ -7,11 +7,17 @@ const http = require('http')
 
 const HOST = process.env.MC_HOST || process.argv[2] || 'jamsmp.mcsh.gg'
 const PORT = process.env.MC_PORT ? parseInt(process.env.MC_PORT, 10) : (process.argv[3] ? parseInt(process.argv[3], 10) : undefined)
-// Set MC_VERSION env variable on Render (e.g. '1.20.4' or '1.21.1') if auto-detect fails
-const VERSION = process.env.MC_VERSION || false 
+
+// Ignore invalid MC_VERSION environment variables (like '26.1') and force protocol auto-detection
+let envVersion = process.env.MC_VERSION
+if (envVersion && !envVersion.startsWith('1.')) {
+  console.log(`[AFK] Invalid MC_VERSION env var detected ("${envVersion}"). Discarding and using auto-detection.`)
+  envVersion = false
+}
+
+const VERSION = envVersion || false
 const USERNAME = process.env.MC_USER || 'AFK'
 const PASSWORD = process.env.MC_PASSWORD || 'AfkBot-Pass-123'
-const PASSIVE = process.env.MC_PASSIVE === '1'
 const RECONNECT_MS = 10000
 
 function start() {
@@ -21,7 +27,7 @@ function start() {
     host: HOST,
     username: USERNAME,
     auth: 'offline',
-    version: VERSION, // false uses auto-detection; set string if server forces specific sub-version
+    version: VERSION, // Auto-detects real Minecraft version (e.g. 1.21)
     checkTimeoutInterval: 60000
   }
   if (PORT) botOptions.port = PORT
@@ -39,16 +45,15 @@ function start() {
     setTimeout(start, RECONNECT_MS)
   }
 
-  bot.once('login', () => console.log(`[AFK] Logged in. Detected Minecraft version: ${bot.version}`))
+  bot.once('login', () => console.log(`[AFK] Logged in. Protocol version detected & used: ${bot.version}`))
 
   bot.once('spawn', () => {
     console.log('[AFK] Joined the server successfully.')
-    if (PASSIVE) { console.log('[AFK] Passive mode active.'); return }
     
     let tick = 0
     timer = setInterval(() => {
       tick++
-      // Smoothly rotate without 'force=true' to allow physics engine to sync position packets
+      // Subtle rotation and arm swing to prevent AFK kick without breaking position sync
       if (bot.entity) {
         bot.look(bot.entity.yaw + (Math.random() - 0.5), 0, false)
       }
@@ -58,11 +63,13 @@ function start() {
     }, 15000)
   })
 
-  // AuthMe support: answer /register and /login prompts automatically
+  // AuthMe support: Handles standard chat, action bars, and title prompts
   let authSent = 0
-  bot.on('messagestr', (msg) => {
-    const m = msg.toLowerCase()
+  const handleAuthPrompt = (rawText) => {
+    if (!rawText) return
+    const m = rawText.toLowerCase()
     if (Date.now() - authSent < 3000) return
+
     if (m.includes('/register')) {
       authSent = Date.now()
       console.log('[AFK] Registering...')
@@ -72,7 +79,11 @@ function start() {
       console.log('[AFK] Logging in...')
       bot.chat(`/login ${PASSWORD}`)
     }
-  })
+  }
+
+  bot.on('messagestr', (msg) => handleAuthPrompt(msg))
+  bot.on('actionBar', (msg) => handleAuthPrompt(msg.getText()))
+  bot.on('title', (text) => handleAuthPrompt(text))
 
   bot.on('kicked', (reason) => console.log('[AFK] Kicked:', typeof reason === 'string' ? reason : JSON.stringify(reason)))
   bot.on('error', (err) => console.log('[AFK] Error:', err.message))
