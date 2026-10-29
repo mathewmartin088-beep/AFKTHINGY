@@ -6,23 +6,22 @@ const mineflayer = require('mineflayer')
 const http = require('http')
 
 const HOST = process.env.MC_HOST || process.argv[2] || 'jamsmp.mcsh.gg'
-// Only set PORT if explicitly defined in environment variables.
-// Leaving it undefined allows Mineflayer to automatically resolve SRV records for domain hosts like .mcsh.gg
 const PORT = process.env.MC_PORT ? parseInt(process.env.MC_PORT, 10) : (process.argv[3] ? parseInt(process.argv[3], 10) : undefined)
-
+// Set MC_VERSION env variable on Render (e.g. '1.20.4' or '1.21.1') if auto-detect fails
+const VERSION = process.env.MC_VERSION || false 
 const USERNAME = process.env.MC_USER || 'AFK'
 const PASSWORD = process.env.MC_PASSWORD || 'AfkBot-Pass-123'
 const PASSIVE = process.env.MC_PASSIVE === '1'
 const RECONNECT_MS = 10000
 
 function start() {
-  console.log(`[AFK] Connecting to ${HOST}${PORT ? ':' + PORT : ''} as ${USERNAME} (auto-detecting protocol)...`)
+  console.log(`[AFK] Connecting to ${HOST}${PORT ? ':' + PORT : ''} as ${USERNAME}...`)
   
   const botOptions = {
     host: HOST,
     username: USERNAME,
     auth: 'offline',
-    version: false, // Auto-detect protocol version from server handshake
+    version: VERSION, // false uses auto-detection; set string if server forces specific sub-version
     checkTimeoutInterval: 60000
   }
   if (PORT) botOptions.port = PORT
@@ -40,17 +39,22 @@ function start() {
     setTimeout(start, RECONNECT_MS)
   }
 
-  bot.once('login', () => console.log(`[AFK] Logged in. Protocol version detected & used: ${bot.version}`))
+  bot.once('login', () => console.log(`[AFK] Logged in. Detected Minecraft version: ${bot.version}`))
 
   bot.once('spawn', () => {
-    console.log('[AFK] Joined the server.')
-    if (PASSIVE) { console.log('[AFK] Passive mode: not moving.'); return }
+    console.log('[AFK] Joined the server successfully.')
+    if (PASSIVE) { console.log('[AFK] Passive mode active.'); return }
     
     let tick = 0
     timer = setInterval(() => {
       tick++
-      bot.look(bot.entity.yaw + (Math.random() - 0.5), 0, true)
-      if (tick % 12 === 0) bot.swingArm('right')
+      // Smoothly rotate without 'force=true' to allow physics engine to sync position packets
+      if (bot.entity) {
+        bot.look(bot.entity.yaw + (Math.random() - 0.5), 0, false)
+      }
+      if (tick % 4 === 0) {
+        bot.swingArm('right')
+      }
     }, 15000)
   })
 
