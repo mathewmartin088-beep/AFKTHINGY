@@ -6,7 +6,6 @@ if (dns.setDefaultResultOrder) {
 const mineflayer = require('mineflayer')
 const http = require('http')
 
-// Direct IP and Port set as default fallbacks
 const HOST = process.env.MC_HOST || process.argv[2] || '198.244.200.55'
 const PORT = process.env.MC_PORT ? parseInt(process.env.MC_PORT, 10) : (process.argv[3] ? parseInt(process.argv[3], 10) : 11046)
 const USERNAME = process.env.MC_USER || 'AFK'
@@ -38,6 +37,16 @@ function start() {
 
   bot.once('login', () => console.log(`[AFK] Logged in successfully.`))
 
+  // Auto-respawn when killed by mobs or environment
+  bot.on('death', () => {
+    console.log('[AFK] Bot died! Respawning automatically...')
+    setTimeout(() => {
+      if (bot && bot.respawn) {
+        bot.respawn()
+      }
+    }, 1000)
+  })
+
   bot.once('spawn', () => {
     console.log('[AFK] Joined the server and spawned.')
     if (timer) clearInterval(timer)
@@ -45,7 +54,8 @@ function start() {
     setTimeout(() => {
       if (ended) return
       timer = setInterval(() => {
-        if (bot && bot.swingArm) {
+        // Only attempt actions if the bot is actually alive
+        if (bot && bot.isAlive && bot.swingArm) {
           bot.swingArm('right')
         }
       }, 15000)
