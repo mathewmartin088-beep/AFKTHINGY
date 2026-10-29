@@ -1,6 +1,7 @@
 // AFK bot: joins your server as a real player (offline-mode servers only),
 // stays "active" with tiny movements, and reconnects if kicked/disconnected.
 const mineflayer = require('mineflayer')
+const http = require('http')
 
 const HOST = process.env.MC_HOST || process.argv[2] || 'localhost'
 const PORT = parseInt(process.env.MC_PORT || process.argv[3] || '25565', 10)
@@ -51,3 +52,11 @@ function start() {
 }
 
 start()
+
+// Render web services must listen on $PORT, otherwise the deploy fails.
+// Ping this URL every ~5 minutes (e.g. UptimeRobot) to stop the free tier sleeping.
+if (process.env.PORT) {
+  http.createServer((req, res) => { res.end('AFK bot running') }).listen(process.env.PORT, () => {
+    console.log('[AFK] Health server on port ' + process.env.PORT)
+  })
+}
