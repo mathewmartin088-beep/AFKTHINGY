@@ -20,7 +20,6 @@ function start() {
     auth: 'offline',
     version: VERSION,
     checkTimeoutInterval: 60000
-    // physicsEnabled left as default (true) to maintain server position sync
   })
 
   let timer = null
@@ -43,7 +42,6 @@ function start() {
     let tick = 0
     timer = setInterval(() => {
       tick++
-      // Gently look around and swing arm to stay active
       bot.look(bot.entity.yaw + (Math.random() - 0.5), 0, true)
       if (tick % 12 === 0) bot.swingArm('right')
     }, 15000)
