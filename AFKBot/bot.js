@@ -1,25 +1,33 @@
-// AFK bot: joins your server as a real player (offline-mode servers only),
-// stays "active" with tiny movements, and reconnects if kicked/disconnected.
+const dns = require('dns')
+// Force IPv4 lookup first to prevent ENETUNREACH errors on Render
+dns.setDefaultResultOrder('ipv4first')
+
 const mineflayer = require('mineflayer')
 const http = require('http')
 
 const HOST = process.env.MC_HOST || process.argv[2] || 'jamsmp.mcsh.gg'
-const PORT = parseInt(process.env.MC_PORT || process.argv[3] || '25565', 10)
+// Only set PORT if explicitly defined in environment variables.
+// Leaving it undefined allows Mineflayer to automatically resolve SRV records for domain hosts like .mcsh.gg
+const PORT = process.env.MC_PORT ? parseInt(process.env.MC_PORT, 10) : (process.argv[3] ? parseInt(process.argv[3], 10) : undefined)
+
 const USERNAME = process.env.MC_USER || 'AFK'
 const PASSWORD = process.env.MC_PASSWORD || 'AfkBot-Pass-123'
 const PASSIVE = process.env.MC_PASSIVE === '1'
 const RECONNECT_MS = 10000
 
 function start() {
-  console.log(`[AFK] Connecting to ${HOST}:${PORT} as ${USERNAME} (auto-detecting protocol)...`)
-  const bot = mineflayer.createBot({
+  console.log(`[AFK] Connecting to ${HOST}${PORT ? ':' + PORT : ''} as ${USERNAME} (auto-detecting protocol)...`)
+  
+  const botOptions = {
     host: HOST,
-    port: PORT,
     username: USERNAME,
     auth: 'offline',
-    version: false, // Step 2: Auto-detects protocol version from server handshake
+    version: false, // Auto-detect protocol version from server handshake
     checkTimeoutInterval: 60000
-  })
+  }
+  if (PORT) botOptions.port = PORT
+
+  const bot = mineflayer.createBot(botOptions)
 
   let timer = null
   let ended = false
@@ -41,7 +49,6 @@ function start() {
     let tick = 0
     timer = setInterval(() => {
       tick++
-      // Look around and swing arm without invalid position packet generation
       bot.look(bot.entity.yaw + (Math.random() - 0.5), 0, true)
       if (tick % 12 === 0) bot.swingArm('right')
     }, 15000)
@@ -70,7 +77,7 @@ function start() {
 
 start()
 
-// Render web service health check listener
+// Render health check listener
 if (process.env.PORT) {
   http.createServer((req, res) => { res.end('AFK bot running') }).listen(process.env.PORT, () => {
     console.log('[AFK] Health server on port ' + process.env.PORT)
