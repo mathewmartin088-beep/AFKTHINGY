@@ -7,6 +7,7 @@ const HOST = process.env.MC_HOST || process.argv[2] || 'localhost'
 const PORT = parseInt(process.env.MC_PORT || process.argv[3] || '25565', 10)
 const VERSION = process.env.MC_VERSION || process.argv[4] || false // false = auto-detect
 const USERNAME = process.env.MC_USER || 'AFK'
+const PASSWORD = process.env.MC_PASSWORD || 'AfkBot-Pass-123'
 const RECONNECT_MS = 10000
 
 function start() {
@@ -44,6 +45,22 @@ function start() {
       }
       if (tick % 12 === 0) bot.swingArm('right')
     }, 15000)
+  })
+
+  // AuthMe support: answer /register and /login prompts automatically
+  let authSent = 0
+  bot.on('messagestr', (msg) => {
+    const m = msg.toLowerCase()
+    if (Date.now() - authSent < 3000) return
+    if (m.includes('/register')) {
+      authSent = Date.now()
+      console.log('[AFK] Registering...')
+      bot.chat(`/register ${PASSWORD} ${PASSWORD}`)
+    } else if (m.includes('/login')) {
+      authSent = Date.now()
+      console.log('[AFK] Logging in...')
+      bot.chat(`/login ${PASSWORD}`)
+    }
   })
 
   bot.on('kicked', (reason) => console.log('[AFK] Kicked:', typeof reason === 'string' ? reason : JSON.stringify(reason)))
