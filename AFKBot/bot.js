@@ -1,6 +1,8 @@
 const dns = require('dns')
-// Force IPv4 lookup first to prevent ENETUNREACH errors on Render
-dns.setDefaultResultOrder('ipv4first')
+// Force IPv4 resolution to prevent ENETUNREACH errors on cloud hosting like Render
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder('ipv4first')
+}
 
 const mineflayer = require('mineflayer')
 const http = require('http')
@@ -11,14 +13,20 @@ const USERNAME = process.env.MC_USER || 'AFK'
 const PASSWORD = process.env.MC_PASSWORD || 'AfkBot-Pass-123'
 const RECONNECT_MS = 10000
 
+// Safely validate version strings (only allow standard Minecraft version tags like '1.20.4' or numeric IDs)
+let versionOption = false
+if (process.env.MC_VERSION && (process.env.MC_VERSION.startsWith('1.') || /^\d+$/.test(process.env.MC_VERSION))) {
+  versionOption = process.env.MC_VERSION
+}
+
 function start() {
   console.log(`[AFK] Connecting to ${HOST}${PORT ? ':' + PORT : ''} as ${USERNAME}...`)
-  
+
   const botOptions = {
     host: HOST,
     username: USERNAME,
     auth: 'offline',
-    version: false, // Auto-detect protocol version directly from server handshake
+    version: versionOption, // Auto-detects protocol if versionOption is false
     checkTimeoutInterval: 60000
   }
   if (PORT) botOptions.port = PORT
@@ -36,26 +44,28 @@ function start() {
     setTimeout(start, RECONNECT_MS)
   }
 
-  bot.once('login', () => console.log(`[AFK] Logged in using protocol version: ${bot.version}`))
+  bot.once('login', () => console.log(`[AFK] Logged in successfully.`))
 
   bot.once('spawn', () => {
     console.log('[AFK] Joined the server and spawned.')
-    
     if (timer) clearInterval(timer)
 
-    timer = setInterval(() => {
-      if (bot.entity && typeof bot.entity.yaw === 'number' && !isNaN(bot.entity.yaw)) {
-        bot.look(bot.entity.yaw + (Math.random() - 0.5), 0, false)
-      }
-      bot.swingArm('right')
-    }, 15000)
+    // Wait 3 seconds after spawn before swinging arms to let AuthMe teleports settle
+    setTimeout(() => {
+      if (ended) return
+      timer = setInterval(() => {
+        if (bot && bot.swingArm) {
+          bot.swingArm('right')
+        }
+      }, 15000)
+    }, 3000)
   })
 
-  // AuthMe automatic login handler
+  // AuthMe support: handles chat, action bars, and title prompts
   let authSent = 0
   const handleAuthPrompt = (rawText) => {
     if (!rawText) return
-    const m = rawText.toLowerCase()
+    const m = String(rawText).toLowerCase()
     if (Date.now() - authSent < 4000) return
 
     if (m.includes('/register')) {
@@ -70,7 +80,7 @@ function start() {
   }
 
   bot.on('messagestr', (msg) => handleAuthPrompt(msg))
-  bot.on('actionBar', (msg) => handleAuthPrompt(msg.getText()))
+  bot.on('actionBar', (msg) => handleAuthPrompt(msg.getText ? msg.getText() : msg))
   bot.on('title', (text) => handleAuthPrompt(text))
 
   bot.on('kicked', (reason) => console.log('[AFK] Kicked:', typeof reason === 'string' ? reason : JSON.stringify(reason)))
@@ -80,6 +90,7 @@ function start() {
 
 start()
 
+// Render health check server
 if (process.env.PORT) {
   http.createServer((req, res) => { res.end('AFK bot running') }).listen(process.env.PORT, () => {
     console.log('[AFK] Health server running on port ' + process.env.PORT)
