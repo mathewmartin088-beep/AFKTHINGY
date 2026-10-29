@@ -25,10 +25,6 @@ function start() {
 
   const bot = mineflayer.createBot(botOptions)
 
-  // Completely disable client-side physics & position packet generation.
-  // Stops Mineflayer from sending gravity/position updates that conflict with Paper/AuthMe.
-  bot.physicsEnabled = false
-
   let timer = null
   let ended = false
 
@@ -45,11 +41,15 @@ function start() {
   bot.once('spawn', () => {
     console.log('[AFK] Joined the server and spawned.')
     
-    // Anti-AFK loop: swing arm only.
-    // Do NOT use bot.look() or movement controls when physics is disabled.
-    timer = setInterval(() => {
-      bot.swingArm('right')
-    }, 15000)
+    if (timer) clearInterval(timer)
+
+    // Wait 3 seconds after spawn before starting the anti-AFK loop to let AuthMe teleports settle
+    setTimeout(() => {
+      if (ended) return
+      timer = setInterval(() => {
+        bot.swingArm('right')
+      }, 15000)
+    }, 3000)
   })
 
   // AuthMe support: handles chat, action bar, and title prompts
