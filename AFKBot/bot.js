@@ -1,5 +1,4 @@
 const dns = require('dns')
-// Force IPv4 resolution to prevent ENETUNREACH errors on cloud hosting like Render
 if (dns.setDefaultResultOrder) {
   dns.setDefaultResultOrder('ipv4first')
 }
@@ -7,31 +6,24 @@ if (dns.setDefaultResultOrder) {
 const mineflayer = require('mineflayer')
 const http = require('http')
 
-const HOST = process.env.MC_HOST || process.argv[2] || 'jamsmp.mcsh.gg'
-const PORT = process.env.MC_PORT ? parseInt(process.env.MC_PORT, 10) : (process.argv[3] ? parseInt(process.argv[3], 10) : undefined)
+// Direct IP and Port set as default fallbacks
+const HOST = process.env.MC_HOST || process.argv[2] || '198.244.200.55'
+const PORT = process.env.MC_PORT ? parseInt(process.env.MC_PORT, 10) : (process.argv[3] ? parseInt(process.argv[3], 10) : 11046)
 const USERNAME = process.env.MC_USER || 'AFK'
 const PASSWORD = process.env.MC_PASSWORD || 'AfkBot-Pass-123'
 const RECONNECT_MS = 10000
 
-// Safely validate version strings (only allow standard Minecraft version tags like '1.20.4' or numeric IDs)
-let versionOption = false
-if (process.env.MC_VERSION && (process.env.MC_VERSION.startsWith('1.') || /^\d+$/.test(process.env.MC_VERSION))) {
-  versionOption = process.env.MC_VERSION
-}
-
 function start() {
-  console.log(`[AFK] Connecting to ${HOST}${PORT ? ':' + PORT : ''} as ${USERNAME}...`)
+  console.log(`[AFK] Connecting directly to ${HOST}:${PORT} as ${USERNAME}...`)
 
-  const botOptions = {
+  const bot = mineflayer.createBot({
     host: HOST,
+    port: PORT,
     username: USERNAME,
     auth: 'offline',
-    version: versionOption, // Auto-detects protocol if versionOption is false
+    version: false, // Auto-detect protocol version during server handshake
     checkTimeoutInterval: 60000
-  }
-  if (PORT) botOptions.port = PORT
-
-  const bot = mineflayer.createBot(botOptions)
+  })
 
   let timer = null
   let ended = false
@@ -50,7 +42,6 @@ function start() {
     console.log('[AFK] Joined the server and spawned.')
     if (timer) clearInterval(timer)
 
-    // Wait 3 seconds after spawn before swinging arms to let AuthMe teleports settle
     setTimeout(() => {
       if (ended) return
       timer = setInterval(() => {
@@ -61,7 +52,7 @@ function start() {
     }, 3000)
   })
 
-  // AuthMe support: handles chat, action bars, and title prompts
+  // AuthMe support
   let authSent = 0
   const handleAuthPrompt = (rawText) => {
     if (!rawText) return
