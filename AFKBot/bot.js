@@ -1,28 +1,39 @@
-const dns = require('dns')
-if (dns.setDefaultResultOrder) {
-  dns.setDefaultResultOrder('ipv4first')
-}
-
+// AFK bot: joins your server as a real player (offline-mode servers only),
+// stays "active" with tiny movements, and reconnects if kicked/disconnected.
 const mineflayer = require('mineflayer')
 const http = require('http')
 
-const HOST = process.env.MC_HOST || process.argv[2] || '198.244.200.55'
-const PORT = process.env.MC_PORT ? parseInt(process.env.MC_PORT, 10) : (process.argv[3] ? parseInt(process.argv[3], 10) : 11046)
+const HOST = process.env.MC_HOST || process.argv[2] || 'localhost'
+const PORT = parseInt(process.env.MC_PORT || process.argv[3] || '25565', 10)
+const VERSION = process.env.MC_VERSION || process.argv[4] || false // false = auto-detect
 const USERNAME = process.env.MC_USER || 'AFK'
 const PASSWORD = process.env.MC_PASSWORD || 'AfkBot-Pass-123'
 const RECONNECT_MS = 10000
 
 function start() {
-  console.log(`[AFK] Connecting directly to ${HOST}:${PORT} as ${USERNAME}...`)
-
+  console.log(`[AFK] Connecting to ${HOST}:${PORT} as ${USERNAME} (version: ${VERSION || 'auto'})...`)
   const bot = mineflayer.createBot({
     host: HOST,
     port: PORT,
     username: USERNAME,
     auth: 'offline',
-    version: false, // Auto-detect protocol version during server handshake
+    version: VERSION,
     checkTimeoutInterval: 60000
   })
+
+  // Mineflayer's physics engine sends position packets that Paper 26.3 rejects
+  // ("Invalid move player packet received"), so turn it off completely.
+  bot.physicsEnabled = false
+
+  // Newer servers reject mineflayer's movement packets ("Invalid move player packet"),
+  // so never send any. The bot stays connected and idle instead.
+  const BLOCKED = new Set(['position', 'position_look', 'look', 'flying', 'vehicle_move'])
+  const rawWrite = bot._client.write.bind(bot._client)
+  bot._client.write = (name, params) => {
+    if (BLOCKED.has(name)) return
+    return rawWrite(name, params)
+  }
+  bot.physicsEnabled = false
 
   let timer = null
   let ended = false
@@ -35,63 +46,42 @@ function start() {
     setTimeout(start, RECONNECT_MS)
   }
 
-  bot.once('login', () => console.log(`[AFK] Logged in successfully.`))
-
-  // Auto-respawn when killed
-  bot.on('death', () => {
-    console.log('[AFK] Bot died! Respawning automatically...')
-    setTimeout(() => {
-      if (bot && bot.respawn) bot.respawn()
-    }, 1000)
-  })
+  bot.once('login', () => console.log(`[AFK] Logged in. Protocol version used: ${bot.version}`))
 
   bot.once('spawn', () => {
-    console.log('[AFK] Joined the server and spawned.')
-    if (timer) clearInterval(timer)
-
-    // Wait 3 seconds for initial spawn teleports and AuthMe prompts to clear
-    setTimeout(() => {
-      if (ended) return
-      timer = setInterval(() => {
-        if (bot && bot.isAlive && bot.swingArm) {
-          bot.swingArm('right')
-        }
-      }, 15000)
-    }, 3000)
+    console.log('[AFK] Joined the server.')
+    timer = setInterval(() => {
+      try { bot.swingArm('right') } catch (e) {}
+    }, 20000)
   })
 
-  // AuthMe support
+  // AuthMe support: answer /register and /login prompts automatically
   let authSent = 0
-  const handleAuthPrompt = (rawText) => {
-    if (!rawText) return
-    const m = String(rawText).toLowerCase()
-    if (Date.now() - authSent < 4000) return
-
+  bot.on('messagestr', (msg) => {
+    const m = msg.toLowerCase()
+    if (Date.now() - authSent < 3000) return
     if (m.includes('/register')) {
       authSent = Date.now()
       console.log('[AFK] Registering...')
-      setTimeout(() => bot.chat(`/register ${PASSWORD} ${PASSWORD}`), 500)
+      bot.chat(`/register ${PASSWORD} ${PASSWORD}`)
     } else if (m.includes('/login')) {
       authSent = Date.now()
       console.log('[AFK] Logging in...')
-      setTimeout(() => bot.chat(`/login ${PASSWORD}`), 500)
+      bot.chat(`/login ${PASSWORD}`)
     }
-  }
-
-  bot.on('messagestr', (msg) => handleAuthPrompt(msg))
-  bot.on('actionBar', (msg) => handleAuthPrompt(msg.getText ? msg.getText() : msg))
-  bot.on('title', (text) => handleAuthPrompt(text))
+  })
 
   bot.on('kicked', (reason) => console.log('[AFK] Kicked:', typeof reason === 'string' ? reason : JSON.stringify(reason)))
-  bot.on('error', (err) => console.log('[AFK] Network Error:', err.message))
+  bot.on('error', (err) => console.log('[AFK] Error:', err.message))
   bot.on('end', (reason) => reconnect(reason))
 }
 
 start()
 
-// Render health check server
+// Render web services must listen on $PORT, otherwise the deploy fails.
+// Ping this URL every ~5 minutes (e.g. UptimeRobot) to stop the free tier sleeping.
 if (process.env.PORT) {
   http.createServer((req, res) => { res.end('AFK bot running') }).listen(process.env.PORT, () => {
-    console.log('[AFK] Health server running on port ' + process.env.PORT)
+    console.log('[AFK] Health server on port ' + process.env.PORT)
   })
 }
